@@ -14,7 +14,7 @@ void draw_time(TickType_t ticks) {
   char buff[16];
   TickType_t secs = (ticks / portTICK_PERIOD_MS) / 10;
 
-  sprintf(buff, "%02d:%02d %03d", secs / 60, secs % 60, ticks % 100);
+  sprintf(buff, "%02d:%02d %03d", secs / 60, secs % 60, (ticks % 100) * 10);
 
   display_send_cmd(DISPLAY_PTR(4));
   display_send_str(buff);
@@ -24,7 +24,6 @@ void draw_timer(void *start) {
   for (;;) {
     TickType_t ticks = xTaskGetTickCount() - (TickType_t)start;
     draw_time(ticks);
-    vTaskDelay(10);
   }
 }
 

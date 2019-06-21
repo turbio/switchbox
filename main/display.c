@@ -7,6 +7,10 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 
+static char cache[256];
+static int cache_cursor;
+static int real_cursor;
+
 static void send_half_op(int rs, int db7, int db6, int db5, int db4) {
   gpio_set_level(CONFIG_DISPLAY_GPIO_RS, rs);
   gpio_set_level(CONFIG_DISPLAY_DB_GPIO_7, db7);
@@ -36,7 +40,21 @@ static void send_op(int rs, uint8_t data) {
   taskENABLE_INTERRUPTS();
 }
 
-void display_send_char(char c) { send_op(1, c); }
+void display_send_char(char c) {
+  if (cache[cache_cursor] == c) {
+    cache_cursor++;
+    return;
+  }
+
+  cache[cache_cursor] = c;
+
+  if (cache_cursor != real_cursor) {
+    send_op(0, DISPLAY_PTR(cache_cursor));
+  }
+
+  send_op(1, c);
+  real_cursor = ++cache_cursor;
+}
 
 void display_send_str(char *str) {
   while (*str) {
@@ -45,9 +63,22 @@ void display_send_str(char *str) {
   }
 }
 
-void display_send_cmd(uint8_t cmd) { send_op(0, cmd); }
+void display_send_cmd(uint8_t cmd) {
+  if (cmd & (1 << 7)) {
+    cache_cursor = cmd & ~(1 << 7);
+    return;
+  }
+
+  send_op(0, cmd);
+}
 
 void display_init() {
+  for (int i = 0; i < sizeof(cache); i++) {
+    cache[i] = 0;
+  }
+  cache_cursor = 0;
+  real_cursor = 0;
+
   gpio_set_level(CONFIG_DISPLAY_GPIO_E, 0);
 
   // set 4bit addressing mode
